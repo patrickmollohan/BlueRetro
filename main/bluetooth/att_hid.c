@@ -237,7 +237,7 @@ find_info_rsp_end:
                     memcpy(device_name, read_type_rsp->data[0].value, rsp_len);
                     bt_hid_set_type_flags_from_name(device, device_name);
                     printf("# dev: %ld type: %ld %s\n", device->ids.id, device->ids.type, device_name);
-					#ifdef CONFIG_RETROSCALER_BLUERETRO_4LEDS_HW
+                    #ifdef CONFIG_RETROSCALER_BLUERETRO_4LEDS_HW
                     dev_led_set(device->ids.id , 1);
                     #endif
 					

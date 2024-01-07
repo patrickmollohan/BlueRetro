@@ -122,7 +122,7 @@ static void wl_init_task(void *arg) {
 
 void app_main()
 {
-	#ifdef CONFIG_RETROSCALER_BLUERETRO_4LEDS_HW
+    #ifdef CONFIG_RETROSCALER_BLUERETRO_4LEDS_HW
     dev_led_init();
     #endif
 	
