@@ -12,6 +12,7 @@
 #include "zephyr/att.h"
 #include "zephyr/gatt.h"
 #include "adapter/hid_parser.h"
+#include "system/led.h"
 
 #define HID_MAX_REPORT 5
 
@@ -236,7 +237,10 @@ find_info_rsp_end:
                     memcpy(device_name, read_type_rsp->data[0].value, rsp_len);
                     bt_hid_set_type_flags_from_name(device, device_name);
                     printf("# dev: %ld type: %ld %s\n", device->ids.id, device->ids.type, device_name);
-
+					#ifdef CONFIG_RETROSCALER_BLUERETRO_4LEDS_HW
+                    dev_led_set(device->ids.id , 1);
+                    #endif
+					
                     device->hid_state = BT_ATT_HID_DISCOVERY;
                     bt_att_cmd_read_group_req_uuid16(device->acl_handle, 0x0001, BT_UUID_GATT_PRIMARY);
                     break;

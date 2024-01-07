@@ -43,10 +43,12 @@
 #define SENSE_P1_ALT_PIN 15
 #define SENSE_P2_ALT_PIN 34
 
+#ifdef CONFIG_RETROSCALER_BLUERETRO_4LEDS_HW
 #define LED_P1_PIN 2
 #define LED_P2_PIN 4
 #define LED_P3_PIN 12
 #define LED_P4_PIN 15
+#endif
 
 #define RELAY_PULSE_MS 20
 #define DUTY_CYCLE_HALF 0x80000
