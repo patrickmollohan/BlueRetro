@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import struct
-from serial import Serial
+from serial import serial_for_url
 from time import sleep
 
 
 class BlueRetroInjector:
-    def __init__(self, dev="/dev/ttyUSB1", handle=0):
-        self.fd = Serial(port=dev, baudrate=921600, timeout=1)
+    def __init__(self, dev="socket://localhost:5555", handle=0):
+        self.fd = serial_for_url(url=dev, baudrate=921600, timeout=1)
         self.handle = handle
 
     def __write(self, cmd, handle, data=b''):
@@ -20,8 +20,8 @@ class BlueRetroInjector:
     def get_logs(self):
         self.__read()
 
-    def connect(self):
-        self.__write(0x01, self.handle)
+    def connect(self, bt_conn_type):
+        self.__write(0x01, self.handle, bt_conn_type.to_bytes(1, 'big'))
 
     def disconnect(self):
         self.__write(0x02, self.handle)
@@ -42,10 +42,13 @@ class BlueRetroInjector:
         self.__write(0x07, self.handle, bytes.fromhex(cfg))
 
     def send_out_cfg(self, index, cfg):
-        self.__write(0x08, self.handle, index.to_bytes + bytes.fromhex(cfg))
+        self.__write(0x08, self.handle, index.to_bytes(1, 'big') + bytes.fromhex(cfg))
 
     def send_in_cfg(self, index, cfg):
-        self.__write(0x09, self.handle, index.to_bytes + bytes.fromhex(cfg))
+        self.__write(0x09, self.handle, index.to_bytes(1, 'big') + bytes.fromhex(cfg))
+
+    def send_system_id(self, system_id):
+        self.__write(0x0A, self.handle, system_id.to_bytes(1, 'big'))
 
 
 def main():
@@ -62,7 +65,7 @@ def main():
                '8103c0'
     hid_report = 'a1010000500000000000'
 
-    bri = BlueRetroInjector()
+    bri = BlueRetroInjector(dev="/dev/ttyUSB1")
 
     bri.connect()
 

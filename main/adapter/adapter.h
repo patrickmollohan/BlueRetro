@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, Jacques Gagnon
+ * Copyright (c) 2019-2024, Jacques Gagnon
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,17 +11,20 @@
 #include "zephyr/atomic.h"
 
 #ifndef __packed
-#define __packed    __attribute__((__packed__))
+#define __packed __attribute__((__packed__))
 #endif
 
-#define RESET   "\033[0m"
-#define BOLD   "\033[1m\033[37m"
-#define GREEN  "\033[1;32m"
+#define RESET "\033[0m"
+#define BOLD "\033[1m\033[37m"
+#define GREEN "\033[1;32m"
 
-#define BT_MAX_DEV   7 /* BT limitation */
+#define BT_MAX_DEV 7 /* BT limitation */
 #define WIRED_MAX_DEV 12 /* Saturn limit */
 #define ADAPTER_MAX_AXES 6
+#define ADAPTER_PS2_MAX_AXES 16
 #define REPORT_MAX_USAGE 16
+#define HID_MAX_REPORT 10
+#define MAX_PULL_BACK 0.95
 
 /* BT device type ID */
 enum {
@@ -96,8 +99,8 @@ enum {
     MOUSE,
     PAD,
     EXTRA,
+    RUMBLE,
     REPORT_MAX,
-    //RUMBLE,
     //LEDS,
 };
 
@@ -259,6 +262,22 @@ enum {
 };
 
 enum {
+    BR_COMBO_BASE_1 = 118,
+    BR_COMBO_BASE_2,
+    BR_COMBO_BASE_3,
+    BR_COMBO_BASE_4,
+    BR_COMBO_SYS_RESET,
+    BR_COMBO_BT_INQUIRY,
+    BR_COMBO_SYS_POWER_OFF,
+    BR_COMBO_FACTORY_RESET,
+    BR_COMBO_DEEP_SLEEP,
+    BR_COMBO_WIRED_RST,
+    BR_COMBO_MAX,
+};
+#define BR_COMBO_CNT (BR_COMBO_MAX - BR_COMBO_BASE_1)
+#define BR_COMBO_MASK 0xFFC00000
+
+enum {
     AXIS_NONE = -1,
     AXIS_LX,
     AXIS_LY,
@@ -266,6 +285,16 @@ enum {
     AXIS_RY,
     TRIG_L,
     TRIG_R,
+    TRIG_LS,
+    TRIG_RS,
+    DPAD_LEFT,
+    DPAD_RIGHT,
+    DPAD_DOWN,
+    DPAD_UP,
+    BTN_LEFT,
+    BTN_RIGHT,
+    BTN_DOWN,
+    BTN_UP,
 };
 
 /* BT flags */
@@ -276,17 +305,19 @@ enum {
     BT_WAITING_FOR_RELEASE_MACRO3,
     BT_WAITING_FOR_RELEASE_MACRO4,
     BT_WAITING_FOR_RELEASE_MACRO5,
+    BT_WAITING_FOR_RELEASE_MACRO6,
     BT_QUIRK_FACE_BTNS_INVERT,
     BT_QUIRK_FACE_BTNS_ROTATE_RIGHT,
     BT_QUIRK_FACE_BTNS_TRIGGER_TO_6BUTTONS,
     BT_QUIRK_TRIGGER_PRI_SEC_INVERT,
-    BT_QUIRK_SW_LEFT_JOYCON,
-    BT_QUIRK_SW_RIGHT_JOYCON,
     BT_QUIRK_8BITDO_N64,
+    BT_QUIRK_8BITDO_N64_MK,
     BT_QUIRK_8BITDO_M30,
     BT_QUIRK_BLUEN64_N64,
     BT_QUIRK_RF_WARRIOR,
     BT_QUIRK_8BITDO_SATURN,
+    BT_QUIRK_STADIA,
+    BT_QUIRK_OUYA,
 };
 
 /* Wired flags */
@@ -360,12 +391,18 @@ enum {
     FB_TYPE_SYS_ID,
 };
 
+enum {
+    HID_IN = 0,
+    HID_OUT,
+    //HID_FTR,
+    HID_TAG_CNT,
+};
+
 struct ctrl_meta {
     int32_t neutral;
     int32_t deadzone;
-    int32_t abs_btn_thrs;
     int32_t abs_max;
-    int32_t sign;
+    int32_t abs_min;
     int32_t polarity;
     int32_t size_min;
     int32_t size_max;
@@ -373,6 +410,12 @@ struct ctrl_meta {
 };
 
 struct ctrl_axis {
+    int32_t value;
+    int32_t relative;
+    struct ctrl_meta *meta;
+};
+
+struct ctrl_axis_wired {
     int32_t value;
     int32_t relative;
     const struct ctrl_meta *meta;
@@ -384,13 +427,20 @@ struct ctrl_btn {
     uint32_t cnt_mask[32];
 };
 
-struct generic_ctrl {
+struct wireless_ctrl {
+    const uint32_t *mask;
+    const uint32_t *desc;
+    struct ctrl_btn btns[4];
+    struct ctrl_axis axes[ADAPTER_PS2_MAX_AXES];
+};
+
+struct wired_ctrl {
     uint32_t index;
     const uint32_t *mask;
     const uint32_t *desc;
     uint32_t map_mask[4];
     struct ctrl_btn btns[4];
-    struct ctrl_axis axes[ADAPTER_MAX_AXES];
+    struct ctrl_axis_wired axes[ADAPTER_PS2_MAX_AXES];
 };
 
 struct generic_fb {
@@ -429,7 +479,9 @@ struct hid_usage {
 struct hid_report {
     uint32_t id;
     uint32_t len;
+    uint32_t tag;
     uint32_t usage_cnt;
+    uint32_t type;
     struct hid_usage usages[REPORT_MAX_USAGE];
 };
 
@@ -437,8 +489,8 @@ struct raw_src_mapping {
     uint32_t mask[4];
     uint32_t desc[4];
     uint32_t btns_mask[32];
-    uint32_t axes_to_btns[6];
-    const struct ctrl_meta *meta;
+    uint32_t axes_to_btns[ADAPTER_PS2_MAX_AXES];
+    struct ctrl_meta meta[ADAPTER_PS2_MAX_AXES];
 };
 
 struct bt_ids {
@@ -460,7 +512,7 @@ struct bt_data_base {
     uint32_t input_len;
     uint8_t *sdp_data;
     uint32_t sdp_len;
-    int32_t axes_cal[ADAPTER_MAX_AXES];
+    int32_t axes_cal[ADAPTER_PS2_MAX_AXES];
     uint8_t output[128];
 };
 
@@ -505,11 +557,11 @@ struct bt_adapter {
     struct bt_data data[BT_MAX_DEV];
 };
 
-typedef int32_t (*to_generic_t)(struct bt_data *bt_data, struct generic_ctrl *ctrl_data);
-typedef void (*from_generic_t)(int32_t dev_mode, struct generic_ctrl *ctrl_data, struct wired_data *wired_data);
+typedef int32_t (*to_generic_t)(struct bt_data *bt_data, struct wireless_ctrl *ctrl_data);
+typedef void (*from_generic_t)(int32_t dev_mode, struct wired_ctrl *ctrl_data, struct wired_data *wired_data);
 typedef void (*fb_to_generic_t)(int32_t dev_mode, struct raw_fb *raw_fb_data, struct generic_fb *fb_data);
 typedef void (*fb_from_generic_t)(struct generic_fb *fb_data, struct bt_data *bt_data);
-typedef void (*meta_init_t)(struct generic_ctrl *ctrl_data);
+typedef void (*meta_init_t)(struct wired_ctrl *ctrl_data);
 typedef void (*buffer_init_t)(int32_t dev_mode, struct wired_data *wired_data);
 
 extern const uint32_t hat_to_ld_btns[16];
@@ -517,7 +569,9 @@ extern const uint32_t generic_btns_mask[32];
 extern struct bt_adapter bt_adapter;
 extern struct wired_adapter wired_adapter;
 
+uint32_t adapter_get_out_mask(uint8_t dev_id);
 int32_t btn_id_to_axis(uint8_t btn_id);
+uint8_t btn_is_axis(uint8_t dst_id, uint8_t dst_btn_id);
 uint32_t axis_to_btn_mask(uint8_t axis);
 uint32_t axis_to_btn_id(uint8_t axis);
 int8_t btn_sign(uint32_t polarity, uint8_t btn_id);
@@ -528,6 +582,7 @@ void adapter_fb_stop_timer_stop(uint8_t dev_id);
 uint32_t adapter_bridge_fb(struct raw_fb *fb_data, struct bt_data *bt_data);
 void adapter_q_fb(struct raw_fb *fb_data);
 void adapter_init(void);
+void adapter_meta_init(void);
 
 static inline void bt_type_update(int32_t dev_id, int32_t type, uint32_t subtype) {
     struct bt_data *bt_data = &bt_adapter.data[dev_id];
